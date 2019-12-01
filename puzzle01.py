@@ -23,7 +23,7 @@ def rocket_equation(mass):
 	return math.floor(mass/3) - 2
 
 def fuel_req_incorporated(mass):
-	total = math.floor(mass/3) - 2
+	total = rocket_equation(mass)
 	n  = rocket_equation(total)
 	while n > 0:
 		total += n
