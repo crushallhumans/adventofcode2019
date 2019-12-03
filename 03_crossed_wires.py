@@ -251,37 +251,5 @@ if __name__ == '__main__':
 		f = get_closest_crossing(wire1, wire2)
 		print (f)	
 
-	# 	c = 0
-	# 	d = 1
-	# 	monitor = 1000
-	# 	limit = 5 * 1000000 #5M
-	# 	rrange = 100
-	# 	comblimit = rrange*(rrange-1)
-	# 	print ("begin finder run, ",comblimit)
-	# 	combinations_tried = {}
-	# 	while modified_instructions[0] != 19690720 and len(combinations_tried) < (comblimit):
-	# 		c += 1
-	# 		noun = random.randrange(0,100)
-	# 		verb = random.randrange(0,100)
-	# 		key = f"{verb}-{noun}"
-
-	# 		if (key in combinations_tried):
-	# 			continue
-
-	# 		d += 1
-	# 		combinations_tried[key] = True
-
-	# 		if c and not c % monitor:
-	# 			print ("%i runs",c)
-	# 		if c > limit:
-	# 			break
-
-	# 		modified_instructions = instructions.copy()
-	# 		modified_instructions[1] = noun
-	# 		modified_instructions[2] = verb
-	# 		modified_instructions = process_instructions(modified_instructions)
-
-	# print(modified_instructions)
-	# print (f"eval'd {c} permutations, ran {d} programs")
 	print("done");
 
