@@ -167,8 +167,6 @@ What is the Manhattan distance from the central port to the closest intersection
 
 Your puzzle answer was 1225.
 
-The first half of this puzzle is complete! It provides one gold star: *
-
 --- Part Two ---
 It turns out that this circuit is very timing-sensitive; you actually need to minimize the signal delay.
 
@@ -198,7 +196,9 @@ R98,U47,R26,D63,R33,U87,L62,D20,R33,U53,R51
 U98,R91,D20,R16,D67,R40,U7,R15,U6,R7 = 410 steps
 What is the fewest combined steps the wires must take to reach an intersection?
 
-Although it hasn't changed, you can still get your puzzle input.
+Your puzzle answer was 107036.
+
+Both parts of this puzzle are complete! They provide two gold stars: **
 """)
 
 class testCase(unittest.TestCase):
