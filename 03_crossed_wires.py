@@ -9,8 +9,6 @@ import unittest
 import random
 import itertools
 
-PRINT_MAP = False
-
 def get_closest_crossing(route1,route2):
 	route_map = [[], []]
 	route_steps_map = [{}, {}]
@@ -97,7 +95,8 @@ def get_closest_crossing(route1,route2):
 			lowest_steps = steps
 
 
-	if (PRINT_MAP):
+	if __name__ != '__main__':
+		print(route_map)
 		for i in range(max_coord[1]+1,min_coord[1]-1,-1):
 			for j in range(min_coord[0],max_coord[0]+1):
 				if (j,i) in route_map[0] or (j,i) in route_map[1]:
@@ -112,11 +111,12 @@ def get_closest_crossing(route1,route2):
 					else:
 						print(n, end = '')
 				else:
-					x = '.'
+					x = ' '
 					if (j,i) == (0,0):
 						x = '*'
 					print(x, end = '')
 			print("")
+		print("")
 
 	return (lowest_manhattan_distance, lowest_steps)
 
