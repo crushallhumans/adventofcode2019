@@ -4,10 +4,7 @@
 # 12/2/2019
 
 import sys
-import math
 import unittest
-import random
-import itertools
 from functools import reduce 
 
 #DEBUG = True
@@ -17,9 +14,11 @@ def process_instructions(instructions, inputt = -1):
 	i = 0
 	test_c = 1
 	diag_code = -1
+	num_instrux = len(instructions)
+
 	if DEBUG: print (f"instructions: {instructions}")
 	if DEBUG: print (f"inputt: {inputt}")
-	num_instrux = len(instructions)
+
 	try:
 		jump = 999999
 		while i < num_instrux:
@@ -37,6 +36,7 @@ def process_instructions(instructions, inputt = -1):
 			# handle opcode
 			else:
 				vals = []
+				jump = 4
 
 				# handle parameterized opcode
 				# get operational values
@@ -44,11 +44,23 @@ def process_instructions(instructions, inputt = -1):
 				if (opcode > 99):
 					s_opcode = str(opcode)
 					jump = len(s_opcode)
+
+					# handle leading zeroes for non-IO opcodes
+					if jump == 3 and opcode != 104 and opcode != 103:
+						s_opcode = f"0{s_opcode}"
+						jump = len(s_opcode)
+
 					num_params = jump - 2
 					opcode = int(s_opcode[-2:])
+
+					if not (9 > opcode > 0):
+						raise Exception('bad opcode encoded: {s_opcode}')
+
 					if DEBUG: print (f"opcode: {opcode}")
+					if DEBUG: print (f"s_opcode: {s_opcode}")
 					if DEBUG: print (f"s_opcode[-2:]: {s_opcode[-2:]}")
 					if DEBUG: print (f"processed jump: {jump}")
+
 
 					for d in range(0,num_params):
 						pos = -2-(d+1)
@@ -67,28 +79,39 @@ def process_instructions(instructions, inputt = -1):
 							if DEBUG: print (f"val add RAW: {idx}")
 							vals.append(idx)
 
-					if (
-						((opcode == 1) or (opcode == 2) or (opcode == 5) or (opcode == 6) or (opcode == 7) or (opcode == 8))
-							and
-						(jump == 3)
-					):
-						if DEBUG: print (f"SHORT ADD/MULTIPLY OP AT: {s_opcode}")
-						inner_idx = i+d+2
-						if DEBUG: print (f"inner_idx: {inner_idx}")
-						idx = instructions[inner_idx]
-						if DEBUG: print (f"idx: {idx}")
-						vals.append(instructions[idx])
-						jump = 4
-				else:
-					jump = 4
+					# ** handled better by padding out zeroes for non-IO opcodes
+					# if (
+					# 	((opcode == 1) or (opcode == 2) or (opcode == 5) or (opcode == 6) or (opcode == 7) or (opcode == 8))
+					# 		and
+					# 	(jump == 3)
+					# ):
+					# 	inner_idx = i+d+2
+					# 	idx = instructions[inner_idx]
+
+					# 	if DEBUG: print (f"SHORT OP AT: {s_opcode}")
+					# 	if DEBUG: print (f"inner_idx: {inner_idx}")
+					# 	if DEBUG: print (f"idx: {idx}")
+
+					# 	# short ops have leading "position" parameters (0)
+					# 	vals.append(instructions[idx])
+					# 	jump = 4
 
 
-				# process simplified opcode
-				if (opcode == 5 or opcode == 6):
-					if not len(vals):
-						if DEBUG: print (f"plain opcode 5 / 6 getting vals +1 +2 at {i+1} {i+2}")
+				# handle unparameterized opcode value collection
+				if not len(vals):
+					if DEBUG: print (f"plain opcode {opcode} getting val +1 at {i+1}")
+					if opcode == 3:
+						vals.append(instructions[i+1])
+					else:
 						vals.append(instructions[instructions[i+1]])
+					if (opcode != 3 and opcode != 4):
+						if DEBUG: print (f"plain opcode {opcode} getting val +2 at {i+2}")
 						vals.append(instructions[instructions[i+2]])
+						jump = 4
+
+
+				# jump codes
+				if (opcode == 5 or opcode == 6):
 					if DEBUG: print (f"vals op5/6: {vals}")
 					jump = 3
 					if (opcode == 5):
@@ -106,35 +129,23 @@ def process_instructions(instructions, inputt = -1):
 						else:
 							pass
 
+				# output code
 				elif (opcode == 4):
-					if not len(vals):
-						if DEBUG: print (f"plain opcode 4 getting val +1 at {i+1}")
-						vals.append(instructions[instructions[i+1]])
 					jump = 2
 					if DEBUG: print (f"vals op4: {vals}")
-					if (vals[0] == 0):
-						if DEBUG: print(f"{test_c} test at pos {i}, val of pos {instructions[i+1]} success")
-					else:
-						if DEBUG: print(f"{test_c} test at pos {i}, val of pos {instructions[i+1]} failed: {vals[0]}")
 					diag_code = vals[0]
 					test_c += 1
 
+				# input code
 				elif (opcode == 3):
-					if not len(vals):
-						if DEBUG: print (f"plain opcode 3 getting val +1 at {i+1} {instructions[i+1]}")
-						vals.append(instructions[i+1])
 					jump = 2
 					if DEBUG: print (f"vals op3: {vals}")
 					instructions[vals[0]] = inputt
 					if DEBUG: print (f"write pos: {vals[0]}")
 					if DEBUG: print (f"write val: {inputt}")
 						
+				# operation codes
 				elif (opcode == 1 or opcode == 2 or opcode == 7 or opcode == 8):
-					if not len(vals):
-						if DEBUG: print (f"plain opcode 1 / 2 getting vals +1 +2 at {i+1} {i+2}")
-						vals.append(instructions[instructions[i+1]])
-						vals.append(instructions[instructions[i+2]])
-						jump = 4
 					if DEBUG: print (f"vals op1/2/7/8: {vals}")
 					result = -1
 					if (opcode == 1):
@@ -145,10 +156,12 @@ def process_instructions(instructions, inputt = -1):
 						result = 1 if vals[0] < vals[1] else 0
 					elif (opcode == 8):
 						result = 1 if vals[0] == vals[1] else 0
+
 					position = instructions[i+(jump-1)]
+					instructions[position] = result
+
 					if DEBUG: print (f"write pos: {position}")
 					if DEBUG: print (f"write val: {result}")
-					instructions[position] = result
 				else:
 					raise Exception('opcode not understood: ',opcode) 
 			if DEBUG: print (f"jump: {jump}")
@@ -158,84 +171,6 @@ def process_instructions(instructions, inputt = -1):
 	raise Exception("process_instructions finished organically")
 
 	return False
-
-def puzzle_text():
-	print("""
---- Day 2: 1202 Program Alarm ---
-On the way to your gravity assist around the Moon, your ship computer beeps angrily about a "1202 program alarm". On the radio, an Elf is already explaining how to handle the situation: "Don't worry, that's perfectly norma--" The ship computer bursts into flames.
-
-You notify the Elves that the computer's magic smoke seems to have escaped. "That computer ran Intcode programs like the gravity assist program it was working on; surely there are enough spare parts up there to build a new Intcode computer!"
-
-An Intcode program is a list of integers separated by commas (like 1,0,0,3,99). To run one, start by looking at the first integer (called position 0). Here, you will find an opcode - either 1, 2, or 99. The opcode indicates what to do; for example, 99 means that the program is finished and should immediately halt. Encountering an unknown opcode means something went wrong.
-
-Opcode 1 adds together numbers read from two positions and stores the result in a third position. The three integers immediately after the opcode tell you these three positions - the first two indicate the positions from which you should read the input values, and the third indicates the position at which the output should be stored.
-
-For example, if your Intcode computer encounters 1,10,20,30, it should read the values at positions 10 and 20, add those values, and then overwrite the value at position 30 with their sum.
-
-Opcode 2 works exactly like opcode 1, except it multiplies the two inputs instead of adding them. Again, the three integers after the opcode indicate where the inputs and outputs are, not their values.
-
-Once you're done processing an opcode, move to the next one by stepping forward 4 positions.
-
-For example, suppose you have the following program:
-
-1,9,10,3,2,3,11,0,99,30,40,50
-For the purposes of illustration, here is the same program split into multiple lines:
-
-1,9,10,3,
-2,3,11,0,
-99,
-30,40,50
-The first four integers, 1,9,10,3, are at positions 0, 1, 2, and 3. Together, they represent the first opcode (1, addition), the positions of the two inputs (9 and 10), and the position of the output (3). To handle this opcode, you first need to get the values at the input positions: position 9 contains 30, and position 10 contains 40. Add these numbers together to get 70. Then, store this value at the output position; here, the output position (3) is at position 3, so it overwrites itself. Afterward, the program looks like this:
-
-1,9,10,70,
-2,3,11,0,
-99,
-30,40,50
-Step forward 4 positions to reach the next opcode, 2. This opcode works just like the previous, but it multiplies instead of adding. The inputs are at positions 3 and 11; these positions contain 70 and 50 respectively. Multiplying these produces 3500; this is stored at position 0:
-
-3500,9,10,70,
-2,3,11,0,
-99,
-30,40,50
-Stepping forward 4 more positions arrives at opcode 99, halting the program.
-
-Here are the initial and final states of a few more small programs:
-
-1,0,0,0,99 becomes 2,0,0,0,99 (1 + 1 = 2).
-2,3,0,3,99 becomes 2,3,0,6,99 (3 * 2 = 6).
-2,4,4,5,99,0 becomes 2,4,4,5,99,9801 (99 * 99 = 9801).
-1,1,1,4,99,5,6,0,99 becomes 30,1,1,4,2,5,6,0,99.
-Once you have a working computer, the first step is to restore the gravity assist program (your puzzle input) to the "1202 program alarm" state it had just before the last computer caught fire. To do this, before running the program, replace position 1 with the value 12 and replace position 2 with the value 2. What value is left at position 0 after the program halts?
-
-Your puzzle answer was 4484226.
-
---- Part Two ---
-"Good, the new computer seems to be working correctly! Keep it nearby during this mission - you'll probably use it again. Real Intcode computers support many more features than your new one, but we'll let you know what they are as you need them."
-
-"However, your current priority should be to complete your gravity assist around the Moon. For this mission to succeed, we should settle on some terminology for the parts you've already built."
-
-Intcode programs are given as a list of integers; these values are used as the initial state for the computer's memory. When you run an Intcode program, make sure to start by initializing memory to the program's values. A position in memory is called an address (for example, the first value in memory is at "address 0").
-
-Opcodes (like 1, 2, or 99) mark the beginning of an instruction. The values used immediately after an opcode, if any, are called the instruction's parameters. For example, in the instruction 1,2,3,4, 1 is the opcode; 2, 3, and 4 are the parameters. The instruction 99 contains only an opcode and has no parameters.
-
-The address of the current instruction is called the instruction pointer; it starts at 0. After an instruction finishes, the instruction pointer increases by the number of values in the instruction; until you add more instructions to the computer, this is always 4 (1 opcode + 3 parameters) for the add and multiply instructions. (The halt instruction would increase the instruction pointer by 1, but it halts the program instead.)
-
-"With terminology out of the way, we're ready to proceed. To complete the gravity assist, you need to determine what pair of inputs produces the output 19690720."
-
-The inputs should still be provided to the program by replacing the values at addresses 1 and 2, just like before. In this program, the value placed in address 1 is called the noun, and the value placed in address 2 is called the verb. Each of the two input values will be between 0 and 99, inclusive.
-
-Once the program has halted, its output is available at address 0, also just like before. Each time you try a pair of inputs, make sure you first reset the computer's memory to the values in the program (your puzzle input) - in other words, don't reuse memory from a previous attempt.
-
-Find the input noun and verb that cause the program to produce the output 19690720. What is 100 * noun + verb? (For example, if noun=12 and verb=2, the answer would be 1202.)
-
-Your puzzle answer was 5696.
-
-(Final program state was: 
-	[19690720, 56, 96, 2, 1, 1, 2, 3, 1, 3, 4, 3, 1, 5, 0, 3, 2, 6, 1, 112, 1, 5, 19, 113, 2, 6, 23, 226, 1, 27, 5, 227, 2, 9, 31, 681, 1, 5, 35, 682, 2, 6, 39, 1364, 2, 6, 43, 2728, 1, 5, 47, 2729, 2, 9, 51, 8187, 1, 5, 55, 8188, 1, 10, 59, 8192, 1, 63, 6, 8194, 1, 9, 67, 8197, 1, 71, 6, 8199, 1, 75, 13, 8204, 2, 79, 13, 41020, 2, 9, 83, 123060, 1, 87, 5, 123061, 1, 9, 91, 123064, 2, 10, 95, 492256, 1, 5, 99, 492257, 1, 103, 9, 492260, 1, 13, 107, 492265, 2, 111, 10, 1969060, 1, 115, 5, 1969061, 2, 13, 119, 9845305, 1, 9, 123, 9845308, 1, 5, 127, 9845309, 2, 131, 6, 19690618, 1, 135, 5, 19690619, 1, 139, 6, 19690621, 1, 143, 6, 19690623, 1, 2, 147, 19690719, 1, 151, 5, 0, 99, 2, 14, 0, 0]
-)
-
-Both parts of this puzzle are complete! They provide two gold stars: **
-""")
 
 class testCase(unittest.TestCase):
 	def test_process_instructions(self):
@@ -356,6 +291,10 @@ class testCase(unittest.TestCase):
 			"[3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99],7347289"
 		)
 
+
+
+
+
 if __name__ == '__main__':
 	try:
 		sys.argv[1]
@@ -375,3 +314,97 @@ if __name__ == '__main__':
 
 	print("done");
 
+
+
+
+def puzzle_text():
+	print("""
+--- Day 5: Sunny with a Chance of Asteroids ---
+You're starting to sweat as the ship makes its way toward Mercury. The Elves suggest that you get the air conditioner working by upgrading your ship computer to support the Thermal Environment Supervision Terminal.
+
+The Thermal Environment Supervision Terminal (TEST) starts by running a diagnostic program (your puzzle input). The TEST diagnostic program will run on your existing Intcode computer after a few modifications:
+
+First, you'll need to add two new instructions:
+
+Opcode 3 takes a single integer as input and saves it to the position given by its only parameter. For example, the instruction 3,50 would take an input value and store it at address 50.
+Opcode 4 outputs the value of its only parameter. For example, the instruction 4,50 would output the value at address 50.
+Programs that use these instructions will come with documentation that explains what should be connected to the input and output. The program 3,0,4,0,99 outputs whatever it gets as input, then halts.
+
+Second, you'll need to add support for parameter modes:
+
+Each parameter of an instruction is handled based on its parameter mode. Right now, your ship computer already understands parameter mode 0, position mode, which causes the parameter to be interpreted as a position - if the parameter is 50, its value is the value stored at address 50 in memory. Until now, all parameters have been in position mode.
+
+Now, your ship computer will also need to handle parameters in mode 1, immediate mode. In immediate mode, a parameter is interpreted as a value - if the parameter is 50, its value is simply 50.
+
+Parameter modes are stored in the same value as the instruction's opcode. The opcode is a two-digit number based only on the ones and tens digit of the value, that is, the opcode is the rightmost two digits of the first value in an instruction. Parameter modes are single digits, one per parameter, read right-to-left from the opcode: the first parameter's mode is in the hundreds digit, the second parameter's mode is in the thousands digit, the third parameter's mode is in the ten-thousands digit, and so on. Any missing modes are 0.
+
+For example, consider the program 1002,4,3,4,33.
+
+The first instruction, 1002,4,3,4, is a multiply instruction - the rightmost two digits of the first value, 02, indicate opcode 2, multiplication. Then, going right to left, the parameter modes are 0 (hundreds digit), 1 (thousands digit), and 0 (ten-thousands digit, not present and therefore zero):
+
+ABCDE
+ 1002
+
+DE - two-digit opcode,      02 == opcode 2
+ C - mode of 1st parameter,  0 == position mode
+ B - mode of 2nd parameter,  1 == immediate mode
+ A - mode of 3rd parameter,  0 == position mode,
+                                  omitted due to being a leading zero
+This instruction multiplies its first two parameters. The first parameter, 4 in position mode, works like it did before - its value is the value stored at address 4 (33). The second parameter, 3 in immediate mode, simply has value 3. The result of this operation, 33 * 3 = 99, is written according to the third parameter, 4 in position mode, which also works like it did before - 99 is written to address 4.
+
+Parameters that an instruction writes to will never be in immediate mode.
+
+Finally, some notes:
+
+It is important to remember that the instruction pointer should increase by the number of values in the instruction after the instruction finishes. Because of the new instructions, this amount is no longer always 4.
+Integers can be negative: 1101,100,-1,4,0 is a valid program (find 100 + -1, store the result in position 4).
+The TEST diagnostic program will start by requesting from the user the ID of the system to test by running an input instruction - provide it 1, the ID for the ship's air conditioner unit.
+
+It will then perform a series of diagnostic tests confirming that various parts of the Intcode computer, like parameter modes, function correctly. For each test, it will run an output instruction indicating how far the result of the test was from the expected value, where 0 means the test was successful. Non-zero outputs mean that a function is not working correctly; check the instructions that were run before the output instruction to see which one failed.
+
+Finally, the program will output a diagnostic code and immediately halt. This final output isn't an error; an output followed immediately by a halt means the program finished. If all outputs were zero except the diagnostic code, the diagnostic program ran successfully.
+
+After providing 1 to the only input instruction and passing all the tests, what diagnostic code does the program produce?
+
+Your puzzle answer was 11193703.
+
+--- Part Two ---
+The air conditioner comes online! Its cold air feels good for a while, but then the TEST alarms start to go off. Since the air conditioner can't vent its heat anywhere but back into the spacecraft, it's actually making the air inside the ship warmer.
+
+Instead, you'll need to use the TEST to extend the thermal radiators. Fortunately, the diagnostic program (your puzzle input) is already equipped for this. Unfortunately, your Intcode computer is not.
+
+Your computer is only missing a few opcodes:
+
+Opcode 5 is jump-if-true: if the first parameter is non-zero, it sets the instruction pointer to the value from the second parameter. Otherwise, it does nothing.
+Opcode 6 is jump-if-false: if the first parameter is zero, it sets the instruction pointer to the value from the second parameter. Otherwise, it does nothing.
+Opcode 7 is less than: if the first parameter is less than the second parameter, it stores 1 in the position given by the third parameter. Otherwise, it stores 0.
+Opcode 8 is equals: if the first parameter is equal to the second parameter, it stores 1 in the position given by the third parameter. Otherwise, it stores 0.
+Like all instructions, these instructions need to support parameter modes as described above.
+
+Normally, after an instruction is finished, the instruction pointer increases by the number of values in that instruction. However, if the instruction modifies the instruction pointer, that value is used and the instruction pointer is not automatically increased.
+
+For example, here are several programs that take one input, compare it to the value 8, and then produce one output:
+
+3,9,8,9,10,9,4,9,99,-1,8 - Using position mode, consider whether the input is equal to 8; output 1 (if it is) or 0 (if it is not).
+3,9,7,9,10,9,4,9,99,-1,8 - Using position mode, consider whether the input is less than 8; output 1 (if it is) or 0 (if it is not).
+3,3,1108,-1,8,3,4,3,99 - Using immediate mode, consider whether the input is equal to 8; output 1 (if it is) or 0 (if it is not).
+3,3,1107,-1,8,3,4,3,99 - Using immediate mode, consider whether the input is less than 8; output 1 (if it is) or 0 (if it is not).
+Here are some jump tests that take an input, then output 0 if the input was zero or 1 if the input was non-zero:
+
+3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9 (using position mode)
+3,3,1105,-1,9,1101,0,0,12,4,12,99,1 (using immediate mode)
+Here's a larger example:
+
+3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
+1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
+999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99
+The above example program uses an input instruction to ask for a single number. The program will then output 999 if the input value is below 8, output 1000 if the input value is equal to 8, or output 1001 if the input value is greater than 8.
+
+This time, when the TEST diagnostic program runs its input instruction to get the ID of the system to test, provide it 5, the ID for the ship's thermal radiator controller. This diagnostic test suite only outputs one number, the diagnostic code.
+
+What is the diagnostic code for system ID 5?
+
+Your puzzle answer was 12410607.
+
+Both parts of this puzzle are complete! They provide two gold stars: **
+""")
