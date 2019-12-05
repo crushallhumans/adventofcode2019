@@ -61,7 +61,7 @@ def process_instructions(instructions, inputt = -1):
 					if DEBUG: print (f"s_opcode[-2:]: {s_opcode[-2:]}")
 					if DEBUG: print (f"processed jump: {jump}")
 
-
+					# process parameters starting from left of 0N
 					for d in range(0,num_params):
 						pos = -2-(d+1)
 						param = int(s_opcode[pos])
@@ -72,11 +72,13 @@ def process_instructions(instructions, inputt = -1):
 						if DEBUG: print (f"param: {param}")
 						if DEBUG: print (f"inner_idx: {inner_idx}")
 
+						# position mode
 						if param == 0:
-							if DEBUG: print (f"val add i{idx}: {idx}")
+							if DEBUG: print (f"val posmode {idx}: {idx}")
 							vals.append(instructions[idx])
+						# immediate mode
 						elif param == 1:
-							if DEBUG: print (f"val add RAW: {idx}")
+							if DEBUG: print (f"val immmode RAW: {idx}")
 							vals.append(idx)
 
 					# ** handled better by padding out zeroes for non-IO opcodes
@@ -100,16 +102,20 @@ def process_instructions(instructions, inputt = -1):
 				# handle unparameterized opcode value collection
 				if not len(vals):
 					if DEBUG: print (f"plain opcode {opcode} getting val +1 at {i+1}")
+
+					# input code is always immediate
 					if opcode == 3:
 						vals.append(instructions[i+1])
 					else:
 						vals.append(instructions[instructions[i+1]])
+
+					# non-IO codes get a second value
 					if (opcode != 3 and opcode != 4):
 						if DEBUG: print (f"plain opcode {opcode} getting val +2 at {i+2}")
 						vals.append(instructions[instructions[i+2]])
-						jump = 4
 
 
+				#PROCESS OPCODES
 				# jump codes
 				if (opcode == 5 or opcode == 6):
 					if DEBUG: print (f"vals op5/6: {vals}")
