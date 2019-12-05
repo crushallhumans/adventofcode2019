@@ -175,8 +175,8 @@ def process_instructions(instructions, inputt = -1):
 	except:
 		raise Exception("Unknown exception")
 	raise Exception("process_instructions finished organically")
-
 	return False
+
 
 class testCase(unittest.TestCase):
 	def test_process_instructions(self):
