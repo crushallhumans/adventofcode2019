@@ -10,75 +10,153 @@ import random
 import itertools
 from functools import reduce 
 
-DEBUG = True
+#DEBUG = True
+DEBUG = False
 
-def process_instructions(instructions, inputt = 0):
+def process_instructions(instructions, inputt = -1):
 	i = 0
+	test_c = 1
+	diag_code = -1
 	if DEBUG: print (f"instructions: {instructions}")
+	if DEBUG: print (f"inputt: {inputt}")
 	num_instrux = len(instructions)
 	try:
 		jump = 999999
 		while i < num_instrux:
-			if DEBUG: print (f"\n{instructions[i:i+7]}...")
+			if DEBUG: print (f"\n{i}: {instructions[i:i+20]}...")
+
 			opcode = instructions[i]
 			if DEBUG: print (f"opcode: {opcode}")
+
+			# handle exit
 			if (opcode == 99):
 				jump = 0
-				return instructions
+				if DEBUG: print (" ___ 99 ___ \n\n")
+				return (diag_code,instructions)
+
+			# handle opcode
 			else:
 				vals = []
+
+				# handle parameterized opcode
+				# get operational values
+				# set cursor jump value
 				if (opcode > 99):
 					s_opcode = str(opcode)
 					jump = len(s_opcode)
 					num_params = jump - 2
 					opcode = int(s_opcode[-2:])
-					if DEBUG: print (f"jump: {jump}")
 					if DEBUG: print (f"opcode: {opcode}")
 					if DEBUG: print (f"s_opcode[-2:]: {s_opcode[-2:]}")
+					if DEBUG: print (f"processed jump: {jump}")
+
 					for d in range(0,num_params):
 						pos = -2-(d+1)
-						if DEBUG: print (f"pos: {pos}")
 						param = int(s_opcode[pos])
+						inner_idx = i+d+1
+						idx = instructions[inner_idx]
+
+						if DEBUG: print (f"pos: {pos}")
 						if DEBUG: print (f"param: {param}")
-						idx = instructions[i+d+1]
-						if DEBUG: print (f"idx: {idx}")
+						if DEBUG: print (f"inner_idx: {inner_idx}")
+
 						if param == 0:
+							if DEBUG: print (f"val add i{idx}: {idx}")
 							vals.append(instructions[idx])
 						elif param == 1:
+							if DEBUG: print (f"val add RAW: {idx}")
 							vals.append(idx)
+
+					if (
+						((opcode == 1) or (opcode == 2) or (opcode == 5) or (opcode == 6) or (opcode == 7) or (opcode == 8))
+							and
+						(jump == 3)
+					):
+						if DEBUG: print (f"SHORT ADD/MULTIPLY OP AT: {s_opcode}")
+						inner_idx = i+d+2
+						if DEBUG: print (f"inner_idx: {inner_idx}")
+						idx = instructions[inner_idx]
+						if DEBUG: print (f"idx: {idx}")
+						vals.append(instructions[idx])
+						jump = 4
 				else:
 					jump = 4
 
-				if (opcode == 3 or opcode == 4):
-					jump = 2
-					idx = instructions[i+1]
-					if DEBUG: print (f"io idx: {idx}")
-					val1 = instructions[idx]
-					if DEBUG: print (f"io val1: {val1}")
-					if (opcode == 3):
-						instructions[idx] = inputt
-					elif (opcode == 4):
-						print(f"----> OPCODE4: {instructions[idx]}")
-						
-				elif (opcode == 1 or opcode == 2):
+
+				# process simplified opcode
+				if (opcode == 5 or opcode == 6):
 					if not len(vals):
+						if DEBUG: print (f"plain opcode 5 / 6 getting vals +1 +2 at {i+1} {i+2}")
 						vals.append(instructions[instructions[i+1]])
 						vals.append(instructions[instructions[i+2]])
-					if DEBUG: print (f"vals: {vals}")
+					if DEBUG: print (f"vals op5/6: {vals}")
+					jump = 3
+					if (opcode == 5):
+						if vals[0] != 0:
+							if DEBUG: print (f"JUMP TO : {vals[1]}")
+							i = vals[1]
+							continue
+						else:
+							pass
+					elif (opcode == 6):
+						if vals[0] == 0:
+							if DEBUG: print (f"JUMP TO : {vals[1]}")
+							i = vals[1]
+							continue
+						else:
+							pass
+
+				elif (opcode == 4):
+					if not len(vals):
+						if DEBUG: print (f"plain opcode 4 getting val +1 at {i+1}")
+						vals.append(instructions[instructions[i+1]])
+					jump = 2
+					if DEBUG: print (f"vals op4: {vals}")
+					if (vals[0] == 0):
+						if DEBUG: print(f"{test_c} test at pos {i}, val of pos {instructions[i+1]} success")
+					else:
+						if DEBUG: print(f"{test_c} test at pos {i}, val of pos {instructions[i+1]} failed: {vals[0]}")
+					diag_code = vals[0]
+					test_c += 1
+
+				elif (opcode == 3):
+					if not len(vals):
+						if DEBUG: print (f"plain opcode 3 getting val +1 at {i+1} {instructions[i+1]}")
+						vals.append(instructions[i+1])
+					jump = 2
+					if DEBUG: print (f"vals op3: {vals}")
+					instructions[vals[0]] = inputt
+					if DEBUG: print (f"write pos: {vals[0]}")
+					if DEBUG: print (f"write val: {inputt}")
+						
+				elif (opcode == 1 or opcode == 2 or opcode == 7 or opcode == 8):
+					if not len(vals):
+						if DEBUG: print (f"plain opcode 1 / 2 getting vals +1 +2 at {i+1} {i+2}")
+						vals.append(instructions[instructions[i+1]])
+						vals.append(instructions[instructions[i+2]])
+						jump = 4
+					if DEBUG: print (f"vals op1/2/7/8: {vals}")
 					result = -1
 					if (opcode == 1):
 						result = reduce((lambda x, y: x + y), vals)
 					elif (opcode == 2):
 						result = reduce((lambda x, y: x * y), vals)
+					elif (opcode == 7):
+						result = 1 if vals[0] < vals[1] else 0
+					elif (opcode == 8):
+						result = 1 if vals[0] == vals[1] else 0
 					position = instructions[i+(jump-1)]
 					if DEBUG: print (f"write pos: {position}")
+					if DEBUG: print (f"write val: {result}")
 					instructions[position] = result
 				else:
 					raise Exception('opcode not understood: ',opcode) 
+			if DEBUG: print (f"jump: {jump}")
 			i += jump
 	except:
 		raise Exception("Unknown exception")
 	raise Exception("process_instructions finished organically")
+
 	return False
 
 def puzzle_text():
@@ -162,22 +240,120 @@ Both parts of this puzzle are complete! They provide two gold stars: **
 class testCase(unittest.TestCase):
 	def test_process_instructions(self):
 		self.assertEqual(
-			process_instructions([1,9,10,3,2,3,11,0,99,30,40,50]),
-			[3500,9,10,70,2,3,11,0,99,30,40,50]
+			process_instructions([1,9,10,3,2,3,11,0,99,30,40,50])[1],
+			[3500,9,10,70,2,3,11,0,99,30,40,50],
+			"[1,9,10,3,2,3,11,0,99,30,40,50]"
 		)
-		self.assertEqual(process_instructions([1,0,0,0,99]), [2,0,0,0,99])
-		self.assertEqual(process_instructions([2,3,0,3,99]), [2,3,0,6,99])
-		self.assertEqual(process_instructions([2,4,4,5,99,0]), [2,4,4,5,99,9801])
-		self.assertEqual(process_instructions([1,1,1,4,99,5,6,0,99]), [30,1,1,4,2,5,6,0,99])
+		self.assertEqual(process_instructions([1,0,0,0,99])[1], [2,0,0,0,99], [1,0,0,0,99])
+		self.assertEqual(process_instructions([2,3,0,3,99])[1], [2,3,0,6,99], [2,3,0,3,99])
+		self.assertEqual(process_instructions([2,4,4,5,99,0])[1], [2,4,4,5,99,9801], [2,4,4,5,99,0])
+		self.assertEqual(process_instructions([1,1,1,4,99,5,6,0,99])[1], [30,1,1,4,2,5,6,0,99], [1,1,1,4,99,5,6,0,99])
 
-		self.assertEqual(process_instructions(
-			[1002,4,3,4,33]), 
-			[1002,4,3,4,99]
+		self.assertEqual(
+			process_instructions([1002,4,3,4,33])[1], 
+			[1002,4,3,4,99],
+			"[1002,4,3,4,33]"
 		)
 
-		self.assertEqual(process_instructions(
-			[3,0,4,0,99],34939329)[0],
-			34939329
+		self.assertEqual(
+			process_instructions([3,0,4,0,99],34939329)[0],
+			34939329,
+			"[3,0,4,0,99],34939329"
+		)
+
+		self.assertEqual(
+			process_instructions(
+				[3,9,8,9,10,9,4,9,99,-1,8],
+				8
+			)[0],
+			1,
+			"[3,9,8,9,10,9,4,9,99,-1,8],8"
+		)
+
+		self.assertEqual(
+			process_instructions(
+				[3,9,8,9,10,9,4,9,99,-1,8],
+				3
+			)[0],
+			0,
+			"[3,9,8,9,10,9,4,9,99,-1,8],3"
+		)
+
+		self.assertEqual(
+			process_instructions(
+				[3,3,1108,-1,8,3,4,3,99],
+				8
+			)[0],
+			1,
+			"[3,3,1108,-1,8,3,4,3,99],8"
+		)
+
+		self.assertEqual(
+			process_instructions(
+				[3,3,1108,-1,8,3,4,3,99],
+				3
+			)[0],
+			0,
+			"[3,3,1108,-1,8,3,4,3,99],3"
+		)
+
+
+		self.assertEqual(
+			process_instructions(
+				[3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9],
+				0
+			)[0],
+			0,
+			"[3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9],0"
+		)
+		self.assertEqual(
+			process_instructions(
+				[3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9],
+				1291278
+			)[0],
+			1,
+			"[3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9],1291278"
+		)
+		self.assertEqual(
+			process_instructions(
+				[3,3,1105,-1,9,1101,0,0,12,4,12,99,1],
+				0
+			)[0],
+			0,
+			"[3,3,1105,-1,9,1101,0,0,12,4,12,99,1],0"
+		)
+		self.assertEqual(
+			process_instructions(
+				[3,3,1105,-1,9,1101,0,0,12,4,12,99,1],
+				3738281
+			)[0],
+			1,
+			"[3,3,1105,-1,9,1101,0,0,12,4,12,99,1],3738281"
+		)
+
+		self.assertEqual(
+			process_instructions(
+				[3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99],
+				5
+			)[0],
+			999,
+			"[3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99],5"
+		)
+		self.assertEqual(
+			process_instructions(
+				[3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99],
+				8
+			)[0],
+			1000,
+			"[3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99],8"
+		)
+		self.assertEqual(
+			process_instructions(
+				[3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99],
+				7347289
+			)[0],
+			1001,
+			"[3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99],7347289"
 		)
 
 if __name__ == '__main__':
@@ -186,42 +362,16 @@ if __name__ == '__main__':
 		puzzle_text()
 
 	except:
-		instructions = [3,225,1,225,6,6,1100,1,238,225,104,0,1001,191,50,224,101,-64,224,224,4,224,1002,223,8,223,101,5,224,224,1,224,223,223,2,150,218,224,1001,224,-1537,224,4,224,102,8,223,223,1001,224,2,224,1,223,224,223,1002,154,5,224,101,-35,224,224,4,224,1002,223,8,223,1001,224,5,224,1,224,223,223,1102,76,17,225,1102,21,44,224,1001,224,-924,224,4,224,102,8,223,223,1001,224,4,224,1,224,223,223,101,37,161,224,101,-70,224,224,4,224,1002,223,8,223,101,6,224,224,1,223,224,223,102,46,157,224,1001,224,-1978,224,4,224,102,8,223,223,1001,224,5,224,1,224,223,223,1102,5,29,225,1101,10,7,225,1101,43,38,225,1102,33,46,225,1,80,188,224,1001,224,-73,224,4,224,102,8,223,223,101,4,224,224,1,224,223,223,1101,52,56,225,1101,14,22,225,1101,66,49,224,1001,224,-115,224,4,224,1002,223,8,223,1001,224,7,224,1,224,223,223,1101,25,53,225,4,223,99,0,0,0,677,0,0,0,0,0,0,0,0,0,0,0,1105,0,99999,1105,227,247,1105,1,99999,1005,227,99999,1005,0,256,1105,1,99999,1106,227,99999,1106,0,265,1105,1,99999,1006,0,99999,1006,227,274,1105,1,99999,1105,1,280,1105,1,99999,1,225,225,225,1101,294,0,0,105,1,0,1105,1,99999,1106,0,300,1105,1,99999,1,225,225,225,1101,314,0,0,106,0,0,1105,1,99999,108,226,226,224,1002,223,2,223,1005,224,329,101,1,223,223,108,677,677,224,1002,223,2,223,1006,224,344,1001,223,1,223,8,677,677,224,102,2,223,223,1006,224,359,101,1,223,223,7,226,677,224,102,2,223,223,1005,224,374,101,1,223,223,107,226,226,224,102,2,223,223,1006,224,389,101,1,223,223,7,677,226,224,1002,223,2,223,1006,224,404,1001,223,1,223,1107,677,226,224,1002,223,2,223,1006,224,419,1001,223,1,223,1007,226,226,224,102,2,223,223,1005,224,434,101,1,223,223,1008,226,677,224,102,2,223,223,1005,224,449,1001,223,1,223,1007,677,677,224,1002,223,2,223,1006,224,464,1001,223,1,223,1008,226,226,224,102,2,223,223,1006,224,479,101,1,223,223,1007,226,677,224,1002,223,2,223,1005,224,494,1001,223,1,223,108,226,677,224,1002,223,2,223,1006,224,509,101,1,223,223,8,226,677,224,102,2,223,223,1005,224,524,1001,223,1,223,107,677,677,224,1002,223,2,223,1005,224,539,101,1,223,223,107,226,677,224,1002,223,2,223,1006,224,554,101,1,223,223,1107,226,677,224,1002,223,2,223,1006,224,569,1001,223,1,223,1108,677,226,224,102,2,223,223,1005,224,584,1001,223,1,223,1008,677,677,224,102,2,223,223,1005,224,599,1001,223,1,223,1107,677,677,224,102,2,223,223,1006,224,614,101,1,223,223,7,226,226,224,102,2,223,223,1005,224,629,1001,223,1,223,1108,677,677,224,102,2,223,223,1006,224,644,1001,223,1,223,8,677,226,224,1002,223,2,223,1005,224,659,101,1,223,223,1108,226,677,224,102,2,223,223,1005,224,674,101,1,223,223,4,223,99,226]	
-		f = process_instructions(instructions,1)
-		print (f)	
+		instructions = [3,225,1,225,6,6,1100,1,238,225,104,0,1001,191,50,224,101,-64,224,224,4,224,1002,223,8,223,101,5,224,224,1,224,223,223,2,150,218,224,1001,224,-1537,224,4,224,102,8,223,223,1001,224,2,224,1,223,224,223,1002,154,5,224,101,-35,224,224,4,224,1002,223,8,223,1001,224,5,224,1,224,223,223,1102,76,17,225,1102,21,44,224,1001,224,-924,224,4,224,102,8,223,223,1001,224,4,224,1,224,223,223,101,37,161,224,101,-70,224,224,4,224,1002,223,8,223,101,6,224,224,1,223,224,223,102,46,157,224,1001,224,-1978,224,4,224,102,8,223,223,1001,224,5,224,1,224,223,223,1102,5,29,225,1101,10,7,225,1101,43,38,225,1102,33,46,225,1,80,188,224,1001,224,-73,224,4,224,102,8,223,223,101,4,224,224,1,224,223,223,1101,52,56,225,1101,14,22,225,1101,66,49,224,1001,224,-115,224,4,224,1002,223,8,223,1001,224,7,224,1,224,223,223,1101,25,53,225,4,223,99,0,0,0,677,0,0,0,0,0,0,0,0,0,0,0,1105,0,99999,1105,227,247,1105,1,99999,1005,227,99999,1005,0,256,1105,1,99999,1106,227,99999,1106,0,265,1105,1,99999,1006,0,99999,1006,227,274,1105,1,99999,1105,1,280,1105,1,99999,1,225,225,225,1101,294,0,0,105,1,0,1105,1,99999,1106,0,300,1105,1,99999,1,225,225,225,1101,314,0,0,106,0,0,1105,1,99999,108,226,226,224,1002,223,2,223,1005,224,329,101,1,223,223,108,677,677,224,1002,223,2,223,1006,224,344,1001,223,1,223,8,677,677,224,102,2,223,223,1006,224,359,101,1,223,223,7,226,677,224,102,2,223,223,1005,224,374,101,1,223,223,107,226,226,224,102,2,223,223,1006,224,389,101,1,223,223,7,677,226,224,1002,223,2,223,1006,224,404,1001,223,1,223,1107,677,226,224,1002,223,2,223,1006,224,419,1001,223,1,223,1007,226,226,224,102,2,223,223,1005,224,434,101,1,223,223,1008,226,677,224,102,2,223,223,1005,224,449,1001,223,1,223,1007,677,677,224,1002,223,2,223,1006,224,464,1001,223,1,223,1008,226,226,224,102,2,223,223,1006,224,479,101,1,223,223,1007,226,677,224,1002,223,2,223,1005,224,494,1001,223,1,223,108,226,677,224,1002,223,2,223,1006,224,509,101,1,223,223,8,226,677,224,102,2,223,223,1005,224,524,1001,223,1,223,107,677,677,224,1002,223,2,223,1005,224,539,101,1,223,223,107,226,677,224,1002,223,2,223,1006,224,554,101,1,223,223,1107,226,677,224,1002,223,2,223,1006,224,569,1001,223,1,223,1108,677,226,224,102,2,223,223,1005,224,584,1001,223,1,223,1008,677,677,224,102,2,223,223,1005,224,599,1001,223,1,223,1107,677,677,224,102,2,223,223,1006,224,614,101,1,223,223,7,226,226,224,102,2,223,223,1005,224,629,1001,223,1,223,1108,677,677,224,102,2,223,223,1006,224,644,1001,223,1,223,8,677,226,224,1002,223,2,223,1005,224,659,101,1,223,223,1108,226,677,224,102,2,223,223,1005,224,674,101,1,223,223,4,223,99,226]
 
+		# test A/C (1)
+		f = process_instructions(instructions.copy(),1)
+		print (f[0])	
 
-	# 	c = 0
-	# 	d = 1
-	# 	monitor = 1000
-	# 	limit = 5 * 1000000 #5M
-	# 	rrange = 100
-	# 	comblimit = rrange*(rrange-1)
-	# 	print ("begin finder run, ",comblimit)
-	# 	combinations_tried = {}
-	# 	while modified_instructions[0] != 19690720 and len(combinations_tried) < (comblimit):
-	# 		c += 1
-	# 		noun = random.randrange(0,100)
-	# 		verb = random.randrange(0,100)
-	# 		key = f"{verb}-{noun}"
+		print()
+		# test Thermal Radiators (5)
+		f = process_instructions(instructions.copy(),5)
+		print (f[0])	
 
-	# 		if (key in combinations_tried):
-	# 			continue
-
-	# 		d += 1
-	# 		combinations_tried[key] = True
-
-	# 		if c and not c % monitor:
-	# 			print ("%i runs",c)
-	# 		if c > limit:
-	# 			break
-
-	# 		modified_instructions = instructions.copy()
-	# 		modified_instructions[1] = noun
-	# 		modified_instructions[2] = verb
-	# 		modified_instructions = process_instructions(modified_instructions)
-
-	# print(modified_instructions)
-	# print (f"eval'd {c} permutations, ran {d} programs")
 	print("done");
 
