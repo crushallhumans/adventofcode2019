@@ -81,23 +81,6 @@ def process_instructions(instructions, inputt = -1):
 							if DEBUG: print (f"val immmode RAW: {idx}")
 							vals.append(idx)
 
-					# ** handled better by padding out zeroes for non-IO opcodes
-					# if (
-					# 	((opcode == 1) or (opcode == 2) or (opcode == 5) or (opcode == 6) or (opcode == 7) or (opcode == 8))
-					# 		and
-					# 	(jump == 3)
-					# ):
-					# 	inner_idx = i+d+2
-					# 	idx = instructions[inner_idx]
-
-					# 	if DEBUG: print (f"SHORT OP AT: {s_opcode}")
-					# 	if DEBUG: print (f"inner_idx: {inner_idx}")
-					# 	if DEBUG: print (f"idx: {idx}")
-
-					# 	# short ops have leading "position" parameters (0)
-					# 	vals.append(instructions[idx])
-					# 	jump = 4
-
 
 				# handle unparameterized opcode value collection
 				if not len(vals):
