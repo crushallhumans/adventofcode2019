@@ -1,6 +1,6 @@
 # adventofcode 2019
 # crushallhumans
-# puzzle 4
+# puzzle 6 - orbits
 # 12/2/2019
 
 import sys
