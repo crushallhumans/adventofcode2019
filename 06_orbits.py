@@ -90,37 +90,40 @@ def shortest_path(instructions, two_points, saved_map = None):
 
 class testCase(unittest.TestCase):
 	def test_process_instructions(self):
-		self.assertEqual(process_instructions(
-			['COM)B',
-			'B)C',
-			'C)D',
-			'D)E',
-			'E)F',
-			'B)G',
-			'G)H',
-			'D)I',
-			'E)J',
-			'J)K',
-			'K)L'])[1],
+		self.assertEqual(
+			process_instructions(
+				['COM)B',
+				'B)C',
+				'C)D',
+				'D)E',
+				'E)F',
+				'B)G',
+				'G)H',
+				'D)I',
+				'E)J',
+				'J)K',
+				'K)L']
+			)[1],
 			42
 		)
 
-		self.assertEqual(shortest_path(
-			['COM)B',
-			'B)C',
-			'C)D',
-			'D)E',
-			'E)F',
-			'B)G',
-			'G)H',
-			'D)I',
-			'E)J',
-			'J)K',
-			'K)L',
-			'K)YOU',
-			'I)SAN'
-			],
-			('YOU','SAN'))[1],
+		self.assertEqual(
+			shortest_path(
+				['COM)B',
+				'B)C',
+				'C)D',
+				'D)E',
+				'E)F',
+				'B)G',
+				'G)H',
+				'D)I',
+				'E)J',
+				'J)K',
+				'K)L',
+				'K)YOU',
+				'I)SAN'],
+				('YOU','SAN')
+			)[1],
 			4	
 		)
 
