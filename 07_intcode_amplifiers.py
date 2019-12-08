@@ -1,7 +1,7 @@
 # adventofcode 2019
 # crushallhumans
 # puzzle 7 - intcode amplifiers
-# 12/2/2019
+# 12/7/2019
 
 import sys
 import unittest
