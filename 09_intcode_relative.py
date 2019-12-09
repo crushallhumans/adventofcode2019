@@ -8,8 +8,8 @@ import unittest
 from functools import reduce 
 from itertools import permutations 
 
-DEBUG = True
-#DEBUG = False
+#DEBUG = True
+DEBUG = False
 
 def run_phase_sequence(program, sequence, feedback_mode = False):
 	inp = 0
@@ -83,17 +83,27 @@ def process_instructions(instructions, inputs = (), feedback_mode = False, instr
 	if DEBUG: print (f"instructions: {instructions[0:initial_length]}")
 	if DEBUG: print (f"inputs: {inputs}")
 
-	single_param_opcodes = [3,4,9]
-	multi_param_opcodes = [1,2,7,8]
-	jump_opcodes = [5,6] 
+	single_param_opcodes 	= [3,4,9]
+	multi_param_opcodes 	= [1,2,7,8]
+	jump_opcodes 			= [5,6] 
+
+	write_final_param_opcodes = [3,1,2,7,8]
+	read_final_param_opcodes  = [4,5,6,9] 
 
 	try:
 		jump = 999999
 		opcode = None
+		s_opcode = None
+
 		dc = 0
+		monitor = 10000
 		while i < num_instrux:
 			if DEBUG: print (f"\n{dc},{i}: {instructions[i:i+20]}...")
 			dc += 1
+
+			if not dc % monitor:
+				sys.stdout.write('.')  # same as print
+				sys.stdout.flush()
 
 			is_feedback = False
 			if opcode == 'FEEDBACK': #feedback signal
@@ -114,6 +124,8 @@ def process_instructions(instructions, inputs = (), feedback_mode = False, instr
 					diag_code = outputs
 				if DEBUG: print (f" _ {diag_code} _")
 				if DEBUG: print (" ___ 99 ___ \n")
+				if (dc >= monitor):
+					print("")
 				return (diag_code, instructions[0:initial_length], is_feedback, i)
 
 			# handle opcode
@@ -126,15 +138,14 @@ def process_instructions(instructions, inputs = (), feedback_mode = False, instr
 				# set cursor jump value
 				if (opcode > 99):
 					s_opcode = str(opcode)
-					jump = len(s_opcode)
 					opcode = int(s_opcode[-2:])
+					num_params = len(s_opcode) - 2
+					if DEBUG: print (f"num_params: {num_params}")
 
-					# handle leading zeroes for non-IO opcodes
-					if jump == 3 and (opcode not in single_param_opcodes):
-						s_opcode = f"0{s_opcode}"
-						jump = len(s_opcode)
-
-					num_params = jump - 2
+					if (opcode in multi_param_opcodes and 5 > len(s_opcode) > 2):
+						while (len(s_opcode) < 5):
+							s_opcode = f"0{s_opcode}"
+						num_params = 3
 
 					if not (10 > opcode > 0):
 						raise Exception(f"bad opcode encoded: {s_opcode}")
@@ -142,7 +153,8 @@ def process_instructions(instructions, inputs = (), feedback_mode = False, instr
 					if DEBUG: print (f"opcode: {opcode}")
 					if DEBUG: print (f"s_opcode: {s_opcode}")
 					if DEBUG: print (f"s_opcode[-2:]: {s_opcode[-2:]}")
-					if DEBUG: print (f"processed jump: {jump}")
+					if DEBUG: print (f"num_params: {num_params}")
+					if DEBUG: print ("..")
 
 					# process parameters starting from left of 0N
 					for d in range(0,num_params):
@@ -155,28 +167,38 @@ def process_instructions(instructions, inputs = (), feedback_mode = False, instr
 						if DEBUG: print (f"param: {param}")
 						if DEBUG: print (f"inner_idx: {inner_idx}")
 
-						# position mode
-						if param == 0:
-							if DEBUG: print (f"val posmode {idx}: {instructions[idx]}")
-							vals.append(instructions[idx])
 						# immediate mode
-						elif param == 1:
-							if DEBUG: print (f"val immmode RAW: {idx}")
+						if param == 1:
+							if DEBUG: print (f"val immmode appending RAW: {idx}")
 							vals.append(idx)
-						# relative mode
-						elif param == 2:
-							relidx = relative_base + idx
-							if opcode != 3:
+						else:
+							# relative mode
+							if param == 2:
+								relidx = relative_base + idx
 								if DEBUG: print (f"val relmode instructions[{relative_base} + {idx} = {relidx}]: {instructions[relidx]}")
-								vals.append(instructions[relidx])
+								idx = relidx
+							elif param == 0:
+								# position mode
+								if DEBUG: print (f"val posmode {idx}: {instructions[idx]}")
 							else:
-								vals.append(relidx)								
+								raise Exception(f"unknown parameter mode {param}")
+
+							#handle final value (write)
+							if (abs(pos) == len(s_opcode) and opcode in write_final_param_opcodes):
+								# write values are always positional
+								if DEBUG: print (f"final: appending {idx}")
+								vals.append(idx)
+							else:
+								if DEBUG: print (f"middle: appending {instructions[idx]}")
+								vals.append(instructions[idx])
+						if DEBUG: print (".")
+
 								
 
 
 				# handle unparameterized (positional) opcode value collection
 				if not len(vals):
-					if DEBUG: print (f"plain opcode {opcode} getting val +1 at {i+1}")
+					if DEBUG: print (f"plain opcode {opcode} getting val +1 at {instructions[i+1]} ({i+1}): {instructions[instructions[i+1]]}")
 
 					# input code is always immediate
 					if opcode == 3:
@@ -184,31 +206,32 @@ def process_instructions(instructions, inputs = (), feedback_mode = False, instr
 					else:
 						vals.append(instructions[instructions[i+1]])
 
-					# non-IO codes get a second value
-					if (opcode not in single_param_opcodes):
-						if DEBUG: print (f"plain opcode {opcode} getting val +2 at {i+2}")
-						vals.append(instructions[instructions[i+2]])
+					if DEBUG: print (f"plain opcode {opcode} getting val +2 at {instructions[i+2]} ({i+2}): {instructions[instructions[i+2]]}")
+					vals.append(instructions[instructions[i+2]])
+
+					if (opcode in multi_param_opcodes):
+						if DEBUG: print (f"plain opcode {opcode} getting val +3 (write position) at {instructions[i+3]} ({i+3}): {instructions[instructions[i+3]]}")
+						vals.append(instructions[i+3])
 
 
 				#PROCESS OPCODES
 				# jump codes
 				if (opcode in jump_opcodes):
 					if DEBUG: print (f"vals op{opcode}: {vals}")
-					jump = 3
 					if (opcode == 5):
 						if vals[0] != 0:
 							if DEBUG: print (f"JUMP TO : {vals[1]}")
 							i = vals[1]
 							continue
 						else:
-							pass
+							jump = 3
 					elif (opcode == 6):
 						if vals[0] == 0:
 							if DEBUG: print (f"JUMP TO : {vals[1]}")
 							i = vals[1]
 							continue
 						else:
-							pass
+							jump = 3
 
 				# output code
 				elif (opcode == 4):
@@ -253,6 +276,9 @@ def process_instructions(instructions, inputs = (), feedback_mode = False, instr
 				elif (opcode in multi_param_opcodes):
 					if DEBUG: print (f"vals op{opcode}: {vals}")
 					result = -1
+					jump = len(vals)+1
+					position = vals.pop()
+
 					if (opcode == 1):
 						result = reduce((lambda x, y: x + y), vals)
 					elif (opcode == 2):
@@ -262,7 +288,6 @@ def process_instructions(instructions, inputs = (), feedback_mode = False, instr
 					elif (opcode == 8):
 						result = 1 if vals[0] == vals[1] else 0
 
-					position = instructions[i+(jump-1)]
 					instructions[position] = result
 
 					if DEBUG: print (f"write pos: {position}")
@@ -417,16 +442,10 @@ class testCase(unittest.TestCase):
 			)[0],
 			1125899906842624
 		)
-		self.assertEqual(
-			process_instructions(
-				[109,100,203,0,1001,0,100,9000,4,9000,99],
-				923123
-			)[0],
-			923223
-		)
 
 
 	def test_run_phase_sequence(self):
+
 		self.assertEqual(
 			run_phase_sequence(
 				[3,15,3,16,1002,16,10,16,1,16,15,15,4,15,99,0,0],
@@ -483,8 +502,10 @@ if __name__ == '__main__':
 		instructions = [1102,34463338,34463338,63,1007,63,34463338,63,1005,63,53,1102,3,1,1000,109,988,209,12,9,1000,209,6,209,3,203,0,1008,1000,1,63,1005,63,65,1008,1000,2,63,1005,63,904,1008,1000,0,63,1005,63,58,4,25,104,0,99,4,0,104,0,99,4,17,104,0,99,0,0,1101,0,33,1017,1101,24,0,1014,1101,519,0,1028,1102,34,1,1004,1101,0,31,1007,1101,0,844,1025,1102,0,1,1020,1102,38,1,1003,1102,39,1,1008,1102,849,1,1024,1101,0,22,1001,1102,25,1,1009,1101,1,0,1021,1101,0,407,1022,1101,404,0,1023,1101,0,35,1013,1101,27,0,1011,1101,0,37,1016,1102,1,26,1019,1102,28,1,1015,1101,0,30,1000,1102,1,36,1005,1101,0,29,1002,1101,23,0,1012,1102,1,32,1010,1102,21,1,1006,1101,808,0,1027,1102,20,1,1018,1101,0,514,1029,1102,1,815,1026,109,14,2107,24,-5,63,1005,63,199,4,187,1105,1,203,1001,64,1,64,1002,64,2,64,109,-1,2108,21,-7,63,1005,63,225,4,209,1001,64,1,64,1106,0,225,1002,64,2,64,109,-16,1201,6,0,63,1008,63,35,63,1005,63,249,1001,64,1,64,1106,0,251,4,231,1002,64,2,64,109,9,2102,1,2,63,1008,63,37,63,1005,63,271,1105,1,277,4,257,1001,64,1,64,1002,64,2,64,109,11,1208,-8,23,63,1005,63,293,1105,1,299,4,283,1001,64,1,64,1002,64,2,64,109,8,21107,40,39,-8,1005,1017,319,1001,64,1,64,1106,0,321,4,305,1002,64,2,64,109,-28,2101,0,6,63,1008,63,39,63,1005,63,341,1106,0,347,4,327,1001,64,1,64,1002,64,2,64,109,19,2107,26,-7,63,1005,63,363,1106,0,369,4,353,1001,64,1,64,1002,64,2,64,109,1,1202,-9,1,63,1008,63,39,63,1005,63,395,4,375,1001,64,1,64,1105,1,395,1002,64,2,64,109,9,2105,1,-3,1106,0,413,4,401,1001,64,1,64,1002,64,2,64,109,-13,1207,-4,26,63,1005,63,435,4,419,1001,64,1,64,1105,1,435,1002,64,2,64,109,-1,21101,41,0,7,1008,1019,41,63,1005,63,461,4,441,1001,64,1,64,1105,1,461,1002,64,2,64,109,7,21107,42,43,-2,1005,1017,479,4,467,1105,1,483,1001,64,1,64,1002,64,2,64,109,-6,21108,43,46,0,1005,1013,499,1106,0,505,4,489,1001,64,1,64,1002,64,2,64,109,17,2106,0,-2,4,511,1105,1,523,1001,64,1,64,1002,64,2,64,109,-27,1202,-1,1,63,1008,63,28,63,1005,63,547,1001,64,1,64,1106,0,549,4,529,1002,64,2,64,109,18,1206,-1,567,4,555,1001,64,1,64,1106,0,567,1002,64,2,64,109,-16,21102,44,1,6,1008,1011,43,63,1005,63,587,1106,0,593,4,573,1001,64,1,64,1002,64,2,64,109,8,21102,45,1,-1,1008,1012,45,63,1005,63,619,4,599,1001,64,1,64,1105,1,619,1002,64,2,64,109,7,1205,1,633,4,625,1106,0,637,1001,64,1,64,1002,64,2,64,109,-8,2102,1,-3,63,1008,63,25,63,1005,63,659,4,643,1105,1,663,1001,64,1,64,1002,64,2,64,109,14,1206,-5,679,1001,64,1,64,1105,1,681,4,669,1002,64,2,64,109,-28,2101,0,2,63,1008,63,30,63,1005,63,707,4,687,1001,64,1,64,1106,0,707,1002,64,2,64,109,21,21101,46,0,0,1008,1019,48,63,1005,63,727,1106,0,733,4,713,1001,64,1,64,1002,64,2,64,109,-3,21108,47,47,1,1005,1017,751,4,739,1106,0,755,1001,64,1,64,1002,64,2,64,109,-13,1207,0,37,63,1005,63,771,1105,1,777,4,761,1001,64,1,64,1002,64,2,64,109,7,2108,21,-9,63,1005,63,797,1001,64,1,64,1105,1,799,4,783,1002,64,2,64,109,22,2106,0,-5,1001,64,1,64,1106,0,817,4,805,1002,64,2,64,109,-4,1205,-8,829,1106,0,835,4,823,1001,64,1,64,1002,64,2,64,109,-4,2105,1,0,4,841,1105,1,853,1001,64,1,64,1002,64,2,64,109,-30,1208,6,30,63,1005,63,871,4,859,1105,1,875,1001,64,1,64,1002,64,2,64,109,-2,1201,9,0,63,1008,63,22,63,1005,63,897,4,881,1106,0,901,1001,64,1,64,4,64,99,21101,27,0,1,21102,1,915,0,1106,0,922,21201,1,66266,1,204,1,99,109,3,1207,-2,3,63,1005,63,964,21201,-2,-1,1,21102,942,1,0,1105,1,922,22101,0,1,-1,21201,-2,-3,1,21101,0,957,0,1106,0,922,22201,1,-1,-2,1105,1,968,21202,-2,1,-2,109,-3,2106,0,0]
 
 		# get BOOST code
-		print (process_instructions(instructions,1))
+		print (process_instructions(instructions,1)[0])
 
+		# get distress code
+		print (process_instructions(instructions,2)[0])
 
 
 
@@ -495,84 +516,53 @@ if __name__ == '__main__':
 
 def puzzle_text():
 	print("""
---- Day 7: Amplification Circuit ---
-Based on the navigational maps, you're going to need to send more power to your ship's thrusters to reach Santa in time. To do this, you'll need to configure a series of amplifiers already installed on the ship.
+--- Day 9: Sensor Boost ---
+You've just said goodbye to the rebooted rover and left Mars when you receive a faint distress signal coming from the asteroid belt. It must be the Ceres monitoring station!
 
-There are five amplifiers connected in series; each one receives an input signal and produces an output signal. They are connected such that the first amplifier's output leads to the second amplifier's input, the second amplifier's output leads to the third amplifier's input, and so on. The first amplifier's input value is 0, and the last amplifier's output leads to your ship's thrusters.
+In order to lock on to the signal, you'll need to boost your sensors. The Elves send up the latest BOOST program - Basic Operation Of System Test.
 
-    O-------O  O-------O  O-------O  O-------O  O-------O
-0 ->| Amp A |->| Amp B |->| Amp C |->| Amp D |->| Amp E |-> (to thrusters)
-    O-------O  O-------O  O-------O  O-------O  O-------O
-The Elves have sent you some Amplifier Controller Software (your puzzle input), a program that should run on your existing Intcode computer. Each amplifier will need to run a copy of the program.
+While BOOST (your puzzle input) is capable of boosting your sensors, for tenuous safety reasons, it refuses to do so until the computer it runs on passes some checks to demonstrate it is a complete Intcode computer.
 
-When a copy of the program starts running on an amplifier, it will first use an input instruction to ask the amplifier for its current phase setting (an integer from 0 to 4). Each phase setting is used exactly once, but the Elves can't remember which amplifier needs which phase setting.
+Your existing Intcode computer is missing one key feature: it needs support for parameters in relative mode.
 
-The program will then call another input instruction to get the amplifier's input signal, compute the correct output signal, and supply it back to the amplifier with an output instruction. (If the amplifier has not yet received an input signal, it waits until one arrives.)
+Parameters in mode 2, relative mode, behave very similarly to parameters in position mode: the parameter is interpreted as a position. Like position mode, parameters in relative mode can be read from or written to.
 
-Your job is to find the largest output signal that can be sent to the thrusters by trying every possible combination of phase settings on the amplifiers. Make sure that memory is not shared or reused between copies of the program.
+The important difference is that relative mode parameters don't count from address 0. Instead, they count from a value called the relative base. The relative base starts at 0.
 
-For example, suppose you want to try the phase setting sequence 3,1,2,4,0, which would mean setting amplifier A to phase setting 3, amplifier B to setting 1, C to 2, D to 4, and E to 0. Then, you could determine the output signal that gets sent from amplifier E to the thrusters with the following steps:
+The address a relative mode parameter refers to is itself plus the current relative base. When the relative base is 0, relative mode parameters and position mode parameters with the same value refer to the same address.
 
-Start the copy of the amplifier controller software that will run on amplifier A. At its first input instruction, provide it the amplifier's phase setting, 3. At its second input instruction, provide it the input signal, 0. After some calculations, it will use an output instruction to indicate the amplifier's output signal.
-Start the software for amplifier B. Provide it the phase setting (1) and then whatever output signal was produced from amplifier A. It will then produce a new output signal destined for amplifier C.
-Start the software for amplifier C, provide the phase setting (2) and the value from amplifier B, then collect its output signal.
-Run amplifier D's software, provide the phase setting (4) and input value, and collect its output signal.
-Run amplifier E's software, provide the phase setting (0) and input value, and collect its output signal.
-The final output signal from amplifier E would be sent to the thrusters. However, this phase setting sequence may not have been the best one; another sequence might have sent a higher signal to the thrusters.
+For example, given a relative base of 50, a relative mode parameter of -7 refers to memory address 50 + -7 = 43.
 
-Here are some example programs:
+The relative base is modified with the relative base offset instruction:
 
-Max thruster signal 43210 (from phase setting sequence 4,3,2,1,0):
+Opcode 9 adjusts the relative base by the value of its only parameter. The relative base increases (or decreases, if the value is negative) by the value of the parameter.
+For example, if the relative base is 2000, then after the instruction 109,19, the relative base would be 2019. If the next instruction were 204,-34, then the value at address 1985 would be output.
 
-3,15,3,16,1002,16,10,16,1,16,15,15,4,15,99,0,0
-Max thruster signal 54321 (from phase setting sequence 0,1,2,3,4):
+Your Intcode computer will also need a few other capabilities:
 
-3,23,3,24,1002,24,10,24,1002,23,-1,23,
-101,5,23,23,1,24,23,23,4,23,99,0,0
-Max thruster signal 65210 (from phase setting sequence 1,0,4,3,2):
+The computer's available memory should be much larger than the initial program. Memory beyond the initial program starts with the value 0 and can be read or written like any other memory. (It is invalid to try to access memory at a negative address, though.)
+The computer should have support for large numbers. Some instructions near the beginning of the BOOST program will verify this capability.
+Here are some example programs that use these features:
 
-3,31,3,32,1002,32,10,32,1001,31,-2,31,1007,31,0,33,
-1002,33,7,33,1,33,31,31,1,32,31,31,4,31,99,0,0,0
-Try every combination of phase settings on the amplifiers. What is the highest signal that can be sent to the thrusters?
+109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99 takes no input and produces a copy of itself as output.
+1102,34915192,34915192,7,4,7,99,0 should output a 16-digit number.
+104,1125899906842624,99 should output the large number in the middle.
+The BOOST program will ask for a single input; run it in test mode by providing it the value 1. It will perform a series of checks on each opcode, output any opcodes (and the associated parameter modes) that seem to be functioning incorrectly, and finally output a BOOST keycode.
 
-Your puzzle answer was 17440.
+Once your Intcode computer is fully functional, the BOOST program should report no malfunctioning opcodes when run in test mode; it should only output a single value, the BOOST keycode. What BOOST keycode does it produce?
 
-The first half of this puzzle is complete! It provides one gold star: *
+Your puzzle answer was 2752191671.
 
 --- Part Two ---
-It's no good - in this configuration, the amplifiers can't generate a large enough output signal to produce the thrust you'll need. The Elves quickly talk you through rewiring the amplifiers into a feedback loop:
+You now have a complete Intcode computer.
 
-      O-------O  O-------O  O-------O  O-------O  O-------O
-0 -+->| Amp A |->| Amp B |->| Amp C |->| Amp D |->| Amp E |-.
-   |  O-------O  O-------O  O-------O  O-------O  O-------O |
-   |                                                        |
-   '--------------------------------------------------------+
-                                                            |
-                                                            v
-                                                     (to thrusters)
-Most of the amplifiers are connected as they were before; amplifier A's output is connected to amplifier B's input, and so on. However, the output from amplifier E is now connected into amplifier A's input. This creates the feedback loop: the signal will be sent through the amplifiers many times.
+Finally, you can lock on to the Ceres distress signal! You just need to boost your sensors using the BOOST program.
 
-In feedback loop mode, the amplifiers need totally different phase settings: integers from 5 to 9, again each used exactly once. These settings will cause the Amplifier Controller Software to repeatedly take input and produce output many times before halting. Provide each amplifier its phase setting at its first input instruction; all further input/output instructions are for signals.
+The program runs in sensor boost mode by providing the input instruction the value 2. Once run, it will boost the sensors automatically, but it might take a few seconds to complete the operation on slower hardware. In sensor boost mode, the program will output a single value: the coordinates of the distress signal.
 
-Don't restart the Amplifier Controller Software on any amplifier during this process. Each one should continue receiving and sending signals until it halts.
+Run the BOOST program in sensor boost mode. What are the coordinates of the distress signal?
 
-All signals sent or received in this process will be between pairs of amplifiers except the very first signal and the very last signal. To start the process, a 0 signal is sent to amplifier A's input exactly once.
+Your puzzle answer was 87571.
 
-Eventually, the software on the amplifiers will halt after they have processed the final loop. When this happens, the last output signal from amplifier E is sent to the thrusters. Your job is to find the largest output signal that can be sent to the thrusters using the new phase settings and feedback loop arrangement.
-
-Here are some example programs:
-
-Max thruster signal 139629729 (from phase setting sequence 9,8,7,6,5):
-
-3,26,1001,26,-4,26,3,27,1002,27,2,27,1,27,26,
-27,4,27,1001,28,-1,28,1005,28,6,99,0,0,5
-Max thruster signal 18216 (from phase setting sequence 9,7,8,5,6):
-
-3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54,
--5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4,
-53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10
-Try every combination of the new phase settings on the amplifier feedback loop. What is the highest signal that can be sent to the thrusters?
-
-Although it hasn't changed, you can still get your puzzle input.
-
+Both parts of this puzzle are complete! They provide two gold stars: **
 """)
