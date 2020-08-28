@@ -1,15 +1,15 @@
 # adventofcode 2019
 # crushallhumans
-# puzzle 9 - intcode relative mode
-# 12/9/2019
+# puzzle 10 - asteroids
+# 8/27/2020
 
 import sys
 import unittest
 from functools import reduce 
 from itertools import permutations 
 
-#DEBUG = True
-DEBUG = False
+DEBUG = True
+#DEBUG = False
 
 def run_phase_sequence(program, sequence, feedback_mode = False):
 	inp = 0
